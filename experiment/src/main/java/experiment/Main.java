@@ -59,28 +59,28 @@ public class Main {
 		spark.udf().register("countTokens", (WrappedArray<?> words) -> words.size(),
 				DataTypes.IntegerType);
 
-//		spark.udf().register("x2Multiplier",
-//				new UDF1<WrappedArray<?>, WrappedArray<?>>() {
-//					private static final long serialVersionUID = -5372447039252716846L;
+		// spark.udf().register("x2Multiplier",
+		// new UDF1<WrappedArray<?>, WrappedArray<?>>() {
+		// private static final long serialVersionUID = -5372447039252716846L;
 
-//					@Override
-//					public WrappedArray<?> call(WrappedArray<?> t1) throws Exception {
-//						int i =0;
-//						String[] t2 = (String[]) t1.toArray(null);
-//						String[] retArr = new String[t2.length];
-//
-//						for (String str : t2) {
-//
-//							if (str.charAt(0) == '['
-//									&& str.charAt(1) == '['
-//									&& str.charAt(str.length() - 1) == ']'
-//									&& str.charAt(str.length() - 2) == ']') {
-//								retArr[i++] = str.substring(2, str.length() - 2);
-//							}
-//						}
-//						return retArr;
-//					}
-//				}, DataTypes.ArrayType);
+		// @Override
+		// public WrappedArray<?> call(WrappedArray<?> t1) throws Exception {
+		// int i =0;
+		// String[] t2 = (String[]) t1.toArray(null);
+		// String[] retArr = new String[t2.length];
+		//
+		// for (String str : t2) {
+		//
+		// if (str.charAt(0) == '['
+		// && str.charAt(1) == '['
+		// && str.charAt(str.length() - 1) == ']'
+		// && str.charAt(str.length() - 2) == ']') {
+		// retArr[i++] = str.substring(2, str.length() - 2);
+		// }
+		// }
+		// return retArr;
+		// }
+		// }, DataTypes.ArrayType);
 
 		Dataset<Row> rtdAllWords = rtGetWords.transform(df);
 
@@ -122,44 +122,43 @@ public class Main {
 		// rtdBlueWords.
 
 		// erase stopwords
-		
+
 		// Einlesen der 50 Zeilen-Datei
 
-				StructType table = new StructType(new StructField[] {
-						new StructField("title", DataTypes.StringType, false, Metadata.empty()),
-						new StructField("id", DataTypes.IntegerType, false, Metadata.empty()),
-						new StructField("date", DataTypes.StringType, false, Metadata.empty()),
-						new StructField("article", DataTypes.StringType, false, Metadata.empty()),
-				});
+		StructType table = new StructType(new StructField[] {
+				new StructField("title", DataTypes.StringType, false, Metadata.empty()),
+				new StructField("id", DataTypes.IntegerType, false, Metadata.empty()),
+				new StructField("date", DataTypes.StringType, false, Metadata.empty()),
+				new StructField("article", DataTypes.StringType, false, Metadata.empty()),
+		});
 
-				Dataset<Row> df_02 = context.read()
-						.format("com.databricks.spark.csv")
-						.schema(table)
-						.option("header", "false")
-						.option("delimiter", "\t")
-						.load("wiki_9_50.csv");
+		Dataset<Row> df_02 = context.read()
+				.format("com.databricks.spark.csv")
+				.schema(table)
+				.option("header", "false")
+				.option("delimiter", "\t")
+				.load("wiki_9_50.csv");
 
-				df_02.printSchema();
-				df_02.show();
-				
+		df_02.printSchema();
+		df_02.show();
+
 		// Anzahl Revisionen der einzelnen Artikel
-				System.out.println("Anzahl der Revisionen pro Artikel: " + "\n");
-				df_02.groupBy("title").count().withColumnRenamed("title", "title").show();
-		
+		System.out.println("Anzahl der Revisionen pro Artikel: " + "\n");
+		df_02.groupBy("title").count().withColumnRenamed("title", "title").show();
+
 		// Anzahl Revisionen pro Autoren-ID
-				System.out.println("Anzahl der Revisionen pro Autoren-ID: " + "\n");
-				df_02.groupBy("id").count().withColumnRenamed("id", "id").show();
-				
+		System.out.println("Anzahl der Revisionen pro Autoren-ID: " + "\n");
+		df_02.groupBy("id").count().withColumnRenamed("id", "id").show();
+
 		// Anzahl Revisionen pro Tag
-				System.out.println("Anzahl der Revisionen pro Tag: " + "\n");
-				df_02.groupBy("date").count().withColumnRenamed("date", "date").show();
-				
-		
+		System.out.println("Anzahl der Revisionen pro Tag: " + "\n");
+		df_02.groupBy("date").count().withColumnRenamed("date", "date").show();
+
 		spark.stop();
 	}
 
 	private static void printSparkBegin() {
-		printDog();
+		// printDog();
 		System.out.println("\n" + "Spark commenced" + "\n");
 	}
 
