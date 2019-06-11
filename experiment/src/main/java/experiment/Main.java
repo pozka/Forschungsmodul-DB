@@ -1,14 +1,14 @@
 package experiment;
 
-import static org.apache.spark.sql.functions.callUDF;
-import static org.apache.spark.sql.functions.col;
+import static org.apache.spark.sql.functions.*;
 
+import org.apache.spark.api.java.function.ForeachFunction;
 import org.apache.spark.ml.feature.RegexTokenizer;
+import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SQLContext;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.api.java.UDF1;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
@@ -46,7 +46,6 @@ public class Main {
 
 		df.printSchema();
 
-		// Ausgeben der CSV Datei
 		df.show();
 
 		// Tokenize 1
@@ -58,29 +57,6 @@ public class Main {
 
 		spark.udf().register("countTokens", (WrappedArray<?> words) -> words.size(),
 				DataTypes.IntegerType);
-
-		// spark.udf().register("x2Multiplier",
-		// new UDF1<WrappedArray<?>, WrappedArray<?>>() {
-		// private static final long serialVersionUID = -5372447039252716846L;
-
-		// @Override
-		// public WrappedArray<?> call(WrappedArray<?> t1) throws Exception {
-		// int i =0;
-		// String[] t2 = (String[]) t1.toArray(null);
-		// String[] retArr = new String[t2.length];
-		//
-		// for (String str : t2) {
-		//
-		// if (str.charAt(0) == '['
-		// && str.charAt(1) == '['
-		// && str.charAt(str.length() - 1) == ']'
-		// && str.charAt(str.length() - 2) == ']') {
-		// retArr[i++] = str.substring(2, str.length() - 2);
-		// }
-		// }
-		// return retArr;
-		// }
-		// }, DataTypes.ArrayType);
 
 		Dataset<Row> rtdAllWords = rtGetWords.transform(df);
 
@@ -94,14 +70,12 @@ public class Main {
 		// Tokenize 2
 
 		String pattern1 = "\\x5b\\x5b[\\w\\s]*\\x5d\\x5d";
-		String pattern2 = "\\x5d\\x5d[\\w\\s&&[^\\x5d\\x5b]]*\\x5b\\x5b";
 
 		RegexTokenizer rtGetBlueWords = new RegexTokenizer()
 				.setInputCol("article")
 				.setOutputCol("Blue Words")
 				.setGaps(false)
 				.setPattern(pattern1)
-				// .setPattern("[\\w\\s]*")
 				.setToLowercase(false);
 
 		Dataset<Row> rtdBlueWords = rtGetBlueWords.transform(df);
@@ -109,50 +83,76 @@ public class Main {
 		System.out.println("rtdBlueWords - Linkwörter");
 
 		rtdBlueWords.select("id", "article", "Blue Words")
-				// .withColumn("Blue Words 2", regexp_replace(col("Blue Words"),
-				// "\\x5d\\x5d", ""))
 				.withColumn("tokens", callUDF("countTokens", col("Blue Words")))
 				.show(false);
 
-		// regexTokenizedBlue.withColumn("Blue Words sub", col("Blue
-		// Words").substring(col("Blue Words"), int 2,))
-
 		rtdBlueWords.printSchema();
+		
+		rtdBlueWords.foreach((ForeachFunction<Row>) row -> System.out.println(row));
 
-		// rtdBlueWords.
+		// Blue Words explode and remove [[...]]
 
-		// erase stopwords
+		Dataset<Row> rtdBlueWordsExploded = rtdBlueWords.select(
+				rtdBlueWords.col("title"),
+				rtdBlueWords.col("id"),
+				rtdBlueWords.col("date"),
+				org.apache.spark.sql.functions
+						.explode(rtdBlueWords.col("Blue Words"))
+						.as("Blue Words Exploded"));
+
+		Column a = rtdBlueWordsExploded.col("Blue Words Exploded");
+		a = org.apache.spark.sql.functions
+				.ltrim(a, "[[");
+		a = org.apache.spark.sql.functions
+				.rtrim(a, "]]");
+
+		Dataset<Row> rtdBlueWordsExploded2 = rtdBlueWordsExploded.select(
+				rtdBlueWordsExploded.col("title"),
+				rtdBlueWordsExploded.col("id"),
+				rtdBlueWordsExploded.col("date"),
+				a.as("Blue Words"));
+		rtdBlueWordsExploded2.show();
+
+		// Blue words regroup by id
+
+		rtdBlueWordsExploded2.groupBy("title", "id", "date").agg(collect_set("Blue Words")).show(false);
 
 		// Einlesen der 50 Zeilen-Datei
 
-		StructType table = new StructType(new StructField[] {
-				new StructField("title", DataTypes.StringType, false, Metadata.empty()),
-				new StructField("id", DataTypes.IntegerType, false, Metadata.empty()),
-				new StructField("date", DataTypes.StringType, false, Metadata.empty()),
-				new StructField("article", DataTypes.StringType, false, Metadata.empty()),
-		});
-
-		Dataset<Row> df_02 = context.read()
-				.format("com.databricks.spark.csv")
-				.schema(table)
-				.option("header", "false")
-				.option("delimiter", "\t")
-				.load("wiki_9_50.csv");
-
-		df_02.printSchema();
-		df_02.show();
-
-		// Anzahl Revisionen der einzelnen Artikel
-		System.out.println("Anzahl der Revisionen pro Artikel: " + "\n");
-		df_02.groupBy("title").count().withColumnRenamed("title", "title").show();
-
-		// Anzahl Revisionen pro Autoren-ID
-		System.out.println("Anzahl der Revisionen pro Autoren-ID: " + "\n");
-		df_02.groupBy("id").count().withColumnRenamed("id", "id").show();
-
-		// Anzahl Revisionen pro Tag
-		System.out.println("Anzahl der Revisionen pro Tag: " + "\n");
-		df_02.groupBy("date").count().withColumnRenamed("date", "date").show();
+		// StructType table = new StructType(new StructField[] {
+		// new StructField("title", DataTypes.StringType, false,
+		// Metadata.empty()),
+		// new StructField("id", DataTypes.IntegerType, false,
+		// Metadata.empty()),
+		// new StructField("date", DataTypes.StringType, false,
+		// Metadata.empty()),
+		// new StructField("article", DataTypes.StringType, false,
+		// Metadata.empty()),
+		// });
+		//
+		// Dataset<Row> df_02 = context.read()
+		// .format("com.databricks.spark.csv")
+		// .schema(table)
+		// .option("header", "false")
+		// .option("delimiter", "\t")
+		// .load("wiki_9_50.csv");
+		//
+		// df_02.printSchema();
+		// df_02.show();
+		//
+		// // Anzahl Revisionen der einzelnen Artikel
+		// System.out.println("Anzahl der Revisionen pro Artikel: " + "\n");
+		// df_02.groupBy("title").count().withColumnRenamed("title",
+		// "title").show();
+		//
+		// // Anzahl Revisionen pro Autoren-ID
+		// System.out.println("Anzahl der Revisionen pro Autoren-ID: " + "\n");
+		// df_02.groupBy("id").count().withColumnRenamed("id", "id").show();
+		//
+		// // Anzahl Revisionen pro Tag
+		// System.out.println("Anzahl der Revisionen pro Tag: " + "\n");
+		// df_02.groupBy("date").count().withColumnRenamed("date",
+		// "date").show();
 
 		spark.stop();
 	}
