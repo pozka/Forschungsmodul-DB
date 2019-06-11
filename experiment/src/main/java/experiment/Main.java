@@ -42,7 +42,7 @@ public class Main {
 				.schema(schema)
 				.option("header", "false")
 				.option("delimiter", "\t")
-				.load("wiki_9_1.csv");
+				.load("wiki_9_50.csv");
 
 		df.printSchema();
 
@@ -87,8 +87,6 @@ public class Main {
 				.show(false);
 
 		rtdBlueWords.printSchema();
-		
-		rtdBlueWords.foreach((ForeachFunction<Row>) row -> System.out.println(row));
 
 		// Blue Words explode and remove [[...]]
 
@@ -111,11 +109,35 @@ public class Main {
 				rtdBlueWordsExploded.col("id"),
 				rtdBlueWordsExploded.col("date"),
 				a.as("Blue Words"));
+		rtdBlueWordsExploded2.printSchema();
 		rtdBlueWordsExploded2.show();
+
+		Dataset<Row> crossJoinedDF = rtdBlueWordsExploded2
+				.withColumnRenamed("title", "title_1")
+				.withColumnRenamed("id", "id_1")
+				.withColumnRenamed("date", "date_1")
+				.withColumnRenamed("Blue Words", "BlueWords_1")
+				.crossJoin(rtdBlueWordsExploded2.withColumnRenamed("title", "title_2")
+						.withColumnRenamed("id", "id_2")
+						.withColumnRenamed("date", "date_2")
+						.withColumnRenamed("Blue Words", "BlueWords_2"));
+		crossJoinedDF.show();
+		
+		crossJoinedDF = crossJoinedDF.filter(col("id_1").notEqual(col("id_2")));
+		
+		Dataset<Row> BWtogether = crossJoinedDF
+				.groupBy("id_1","id_2")
+				.count()
+				.withColumnRenamed("count", "BW per article");
+		BWtogether.show();
+		
+//		Dataset<Row> commonBW = crossJoinedDF
+//				.groupBy("Blue Words_1","Blue Words_2");
 
 		// Blue words regroup by id
 
-		rtdBlueWordsExploded2.groupBy("title", "id", "date").agg(collect_set("Blue Words")).show(false);
+		rtdBlueWordsExploded2.groupBy("title", "id", "date")
+				.agg(collect_set("Blue Words")).show(false);
 
 		// Einlesen der 50 Zeilen-Datei
 
