@@ -60,7 +60,7 @@ public class Main {
 
 		Dataset<Row> rtdAllWords = rtGetWords.transform(df);
 
-		System.out.println("rtdAllWords - Anzahl Wörter der Revisionen");
+		System.out.println("rtdAllWords - Quantity of revisions");
 
 		rtdAllWords.select("id", "article", "words")
 				.withColumn("tokens", callUDF("countTokens", col("words"))).show();
@@ -80,7 +80,7 @@ public class Main {
 
 		Dataset<Row> rtdBlueWords = rtGetBlueWords.transform(df);
 
-		System.out.println("rtdBlueWords - Linkwörter");
+		System.out.println("rtdBlueWords - Bluewords");
 
 		rtdBlueWords.select("id", "article", "Blue Words")
 				.withColumn("tokens", callUDF("countTokens", col("Blue Words")))
@@ -103,15 +103,18 @@ public class Main {
 				.ltrim(a, "[[");
 		a = org.apache.spark.sql.functions
 				.rtrim(a, "]]");
-
+		
+		// Kommentar
 		Dataset<Row> rtdBlueWordsExploded2 = rtdBlueWordsExploded.select(
 				rtdBlueWordsExploded.col("title"),
 				rtdBlueWordsExploded.col("id"),
 				rtdBlueWordsExploded.col("date"),
 				a.as("Blue Words"));
+		System.out.println("List Linkwords");
 		rtdBlueWordsExploded2.printSchema();
 		rtdBlueWordsExploded2.show();
 
+		// Kommentar
 		Dataset<Row> crossJoinedDF = rtdBlueWordsExploded2
 				.withColumnRenamed("title", "title_1")
 				.withColumnRenamed("id", "id_1")
@@ -123,13 +126,26 @@ public class Main {
 						.withColumnRenamed("Blue Words", "BlueWords_2"));
 		crossJoinedDF.show();
 		
+		Dataset<Row> crossJoinedDensity = rtdBlueWordsExploded2;
+		
 		crossJoinedDF = crossJoinedDF.filter(col("id_1").notEqual(col("id_2")));
 		
+		// Kommentar
 		Dataset<Row> BWtogether = crossJoinedDF
 				.groupBy("id_1","id_2")
 				.count()
 				.withColumnRenamed("count", "BW per article");
 		BWtogether.show();
+		
+		
+//		//..
+//		Dataset<Row> BWperrevision = rtdBlueWordsExploded
+//				.groupBy("count")
+//				.count()
+//				.withColumnRenamed("count", "BW per revision");
+//		BWperrevision.sort("date");
+//		System.out.println("Anzahl der Linkwörter pro Revision nach Änderungsdatum geordnet");
+//		BWperrevision.show();
 		
 //		Dataset<Row> commonBW = crossJoinedDF
 //				.groupBy("Blue Words_1","Blue Words_2");
@@ -138,7 +154,40 @@ public class Main {
 
 		rtdBlueWordsExploded2.groupBy("title", "id", "date")
 				.agg(collect_set("Blue Words")).show(false);
+		
+		
+		//LinkDensity as article grows
+		
+		Column quantity = rtdBlueWordsExploded.col("Blue Words Exploded");
+		quantity = org.apache.spark.sql.functions.ltrim(quantity, "[[");
+		quantity = org.apache.spark.sql.functions.rtrim(quantity, "]]");
+		//int quantity_num =counter(quantity);
+		
+		
+		//Dataset<Row> crossJoinedLD = rtdBlueWordsExploded2
+		//		.crossJoin(BWtogether.withColumnRenamed("BW per article", "BW counter")).sort("date");
+		
+		Dataset<Row> linkdensityDS = rtdBlueWordsExploded2.select(
+				rtdBlueWordsExploded2.col("title"),
+				rtdBlueWordsExploded2.col("id"),
+				rtdBlueWordsExploded2.col("date"));
+		
+		linkdensityDS.printSchema();
+		linkdensityDS.show();
+		
+		System.out.println("Bluewords quantity //probably trash");
+		Dataset<Row> crossJoinedLD = linkdensityDS
+				.crossJoin(BWtogether.withColumnRenamed("BW per article", "BW quantity")).sort("date");
+		crossJoinedLD.show();
 
+		
+		Dataset<Row> BWCounting = crossJoinedDensity
+				.groupBy("title","date")
+				.count();
+		System.out.println("Bluewords quantity sorted by date of revision");
+		BWCounting.sort("date").show(50);
+		
+		
 		// Einlesen der 50 Zeilen-Datei
 
 		// StructType table = new StructType(new StructField[] {
@@ -178,37 +227,42 @@ public class Main {
 
 		spark.stop();
 	}
+	
+	private static int counter(String quantity) {
+		
+		return quantity.trim().split("\\s+").length;
+	}
 
 	private static void printSparkBegin() {
 		// printDog();
 		System.out.println("\n" + "Spark commenced" + "\n");
 	}
 
-	private static void printDog() {
-		System.out.println("\n"
-				+ "         ,--._______,-.\n"
-				+ "       ,','  ,    .  ,_`-.\n"
-				+ "      / /  ,' , _` ``. |  )       `-..\n"
-				+ "     (,';'\"\"`/ '\"`-._ ` \\/ ______    \\\\\n"
-				+ "       : ,o.-`- ,o.  )\\` -'      `---.))\n"
-				+ "       : , d8b ^-.   '|   `.      `    `.\n"
-				+ "       |/ __:_     `. |  ,  `       `    \\\n"
-				+ "       | ( ,-.`-.    ;'  ;   `       :    ;\n"
-				+ "       | |  ,   `.      /     ;      :    \\\n"
-				+ "       ;-'`:::._,`.__),'             :     ;\n"
-				+ "      / ,  `-   `--                  ;     |\n"
-				+ "     /  \\                   `       ,      |\n"
-				+ "    (    `     :              :    ,\\      |\n"
-				+ "     \\   `.    :     :        :  ,'  \\    :\n"
-				+ "      \\    `|-- `     \\ ,'    ,-'     :-.-';\n"
-				+ "      :     |`--.______;     |        :    :\n"
-				+ "       :    /           |    |         |   \\\n"
-				+ "       |    ;           ;    ;        /     ;\n"
-				+ "     _/--' |           :`-- /         \\_:_:_|\n"
-				+ "   ,',','  |           |___ \\\n"
-				+ "   `^._,--'           / , , .)\n"
-				+ "                      `-._,-'\n");
-	}
+//	private static void printDog() {
+//		System.out.println("\n"
+//				+ "         ,--._______,-.\n"
+//				+ "       ,','  ,    .  ,_`-.\n"
+//				+ "      / /  ,' , _` ``. |  )       `-..\n"
+//				+ "     (,';'\"\"`/ '\"`-._ ` \\/ ______    \\\\\n"
+//				+ "       : ,o.-`- ,o.  )\\` -'      `---.))\n"
+//				+ "       : , d8b ^-.   '|   `.      `    `.\n"
+//				+ "       |/ __:_     `. |  ,  `       `    \\\n"
+//				+ "       | ( ,-.`-.    ;'  ;   `       :    ;\n"
+//				+ "       | |  ,   `.      /     ;      :    \\\n"
+//				+ "       ;-'`:::._,`.__),'             :     ;\n"
+//				+ "      / ,  `-   `--                  ;     |\n"
+//				+ "     /  \\                   `       ,      |\n"
+//				+ "    (    `     :              :    ,\\      |\n"
+//				+ "     \\   `.    :     :        :  ,'  \\    :\n"
+//				+ "      \\    `|-- `     \\ ,'    ,-'     :-.-';\n"
+//				+ "      :     |`--.______;     |        :    :\n"
+//				+ "       :    /           |    |         |   \\\n"
+//				+ "       |    ;           ;    ;        /     ;\n"
+//				+ "     _/--' |           :`-- /         \\_:_:_|\n"
+//				+ "   ,',','  |           |___ \\\n"
+//				+ "   `^._,--'           / , , .)\n"
+//				+ "                      `-._,-'\n");
+//	}
 
 	private static String[] truncate(String[] stringArr) {
 		int i = 0;
