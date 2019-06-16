@@ -187,6 +187,47 @@ public class Main {
 		System.out.println("Bluewords quantity sorted by date of revision");
 		BWCounting.sort("date").show(50);
 		
+		// extract category of articles
+		
+				// read categorylinks.json
+				Dataset<Row> ds = spark.read().json("categorylinks_100.json");		
+				ds.show();
+				
+				// read XML_JSON.json
+				Dataset<Row> ds_02 = spark.read().json("XML_JSON.json");		
+				ds_02.show();
+				
+				// Explode the categorys
+				Dataset<Row> explodedDS = ds
+						.withColumn("category", explode(col("category")))
+						.select(col("id"), col("category"))
+						.distinct();
+
+				System.out.println("\n" + "categorylinks_100.json" + "\n");
+				explodedDS.show(50);
+
+				// category per article
+				//not sure yet, if the join-column is the right one -> ID
+				System.out.println("\n" + "categorys per article" + "\n");
+				Dataset<Row> JoinedDS = ds_02
+						.join(explodedDS, ds_02.col("id").equalTo(explodedDS.col("id")));
+				JoinedDS.show();
+				
+//				Dataset<Row> JoinedDS = ds_02
+//					.crossJoin(explodedDS.withColumnRenamed("id", "id_article")).sort("title");
+//				crossJoinedDS.show(100);
+//				
+				
+				//list where category of redirection link equals article category
+				System.out.println("\n" + "list: category of redirection link equals article category" + "\n");
+				System.out.println("\n" + "// in progress..." + "\n");
+				
+				
+				//list where category of redirection link does not equal article category
+				System.out.println("\n" + "list: category of redirection link does not equal article category" + "\n");
+				System.out.println("\n" + "// in progress..." + "\n");
+						
+				
 		
 		// Einlesen der 50 Zeilen-Datei
 
